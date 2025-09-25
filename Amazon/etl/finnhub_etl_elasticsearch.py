@@ -3,31 +3,72 @@ import numpy as np
 from elasticsearch import Elasticsearch, helpers
 import requests
 import time
+import os
 from datetime import datetime
 
 # Elasticsearch Setup
 print("🔌 Connecting to Elasticsearch...")
-try:
-    # Try basic connection first
-    es = Elasticsearch(['http://localhost:9200'], verify_certs=False, request_timeout=30)
-    info = es.info()
-    print(f"✅ Connected to Elasticsearch {info['version']['number']}")
 
-except Exception as e:
-    print(f"❌ Failed to connect to Elasticsearch: {e}")
-    print("🔄 Trying with authentication...")
+# Get configuration from environment variables (optional)
+ES_HOST = os.getenv('ELASTICSEARCH_HOST', 'http://localhost:9200')
+ES_USERNAME = os.getenv('ELASTICSEARCH_USERNAME', 'elastic')
+ES_PASSWORD = os.getenv('ELASTICSEARCH_PASSWORD', 'BII3iKRTigPZX0Cm4Fiyq9YO')
+
+# Configuration options - modify these for your setup
+ELASTICSEARCH_CONFIGS = [
+    # Option 1: Local Elasticsearch (no auth)
+    {
+        "hosts": ['http://localhost:9200'],
+        "verify_certs": False,
+        "request_timeout": 30,
+        "description": "Local Elasticsearch (no auth)"
+    },
+    # Option 2: Local Elasticsearch (with auth)
+    {
+        "hosts": ['http://localhost:9200'],
+        "basic_auth": ('elastic', 'BII3iKRTigPZX0Cm4Fiyq9YO'),
+        "verify_certs": False,
+        "request_timeout": 30,
+        "description": "Local Elasticsearch (with auth)"
+    },
+    # Option 3: Environment-based configuration
+    {
+        "hosts": [ES_HOST],
+        "basic_auth": (ES_USERNAME, ES_PASSWORD) if ES_USERNAME and ES_PASSWORD else None,
+        "verify_certs": ES_HOST.startswith('https://'),
+        "request_timeout": 30,
+        "description": f"Environment config ({ES_HOST})"
+    }
+]
+
+# Filter out None basic_auth
+for config in ELASTICSEARCH_CONFIGS:
+    if config.get('basic_auth') == (None, None):
+        config.pop('basic_auth', None)
+
+es = None
+for i, config in enumerate(ELASTICSEARCH_CONFIGS, 1):
     try:
-        es = Elasticsearch(
-            ['http://localhost:9200'],
-            basic_auth=('elastic', 'BII3iKRTigPZX0Cm4Fiyq9YO'),
-            verify_certs=False,
-            request_timeout=30
-        )
+        print(f"🔄 Attempt {i}: {config['description']}...")
+        description = config.pop('description')  # Remove description from config
+        es = Elasticsearch(**config)
+
+        # Test connection
         info = es.info()
-        print(f"✅ Connected to Elasticsearch {info['version']['number']} (with auth)")
-    except Exception as e2:
-        print(f"❌ All connection attempts failed: {e2}")
-        exit(1)
+        print(f"✅ Connected to Elasticsearch {info['version']['number']} ({description})")
+        break
+
+    except Exception as e:
+        print(f"❌ Failed: {str(e)[:100]}...")
+        continue
+
+if es is None:
+    print("❌ All Elasticsearch connection attempts failed!")
+    print("\n💡 To fix this:")
+    print("1. For local Elasticsearch: Make sure it's running on localhost:9200")
+    print("2. For Elasticsearch Cloud: Update the script with your actual endpoint and credentials")
+    print("3. Check your network connection and firewall settings")
+    exit(1)
 
 index_name = 'finnhub_stocks'
 
