@@ -28,6 +28,7 @@ show_usage() {
     echo "  etl       Run only the Amazon ETL process"
     echo "  nyc       Run only the NYC Taxi ETL process (Docker)"
     echo "  nyc-local Run NYC Taxi ETL directly on host"
+    echo "  finnhub   Run Finnhub stock ETL to Elasticsearch"
     echo "  clean     Remove all containers and volumes"
     echo "  status    Show status of all services"
     echo ""
@@ -69,6 +70,10 @@ case "${1:-up}" in
     "nyc-local")
         echo "🚕 Running NYC Taxi ETL directly on host..."
         python etl/nyc_taxi_etl.py
+        ;;
+    "finnhub")
+        echo "📈 Running Finnhub Stock ETL to Elasticsearch..."
+        python etl/finnhub_etl_elasticsearch.py
         ;;
     "clean")
         echo "🧹 Cleaning up containers and volumes..."
