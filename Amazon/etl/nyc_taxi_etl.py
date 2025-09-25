@@ -2,7 +2,6 @@ import pandas as pd
 import boto3
 from io import BytesIO
 from sqlalchemy import create_engine
-from datetime import datetime
 import pyarrow.parquet as pq
 from urllib.parse import quote_plus
 import os

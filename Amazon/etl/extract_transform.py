@@ -1,5 +1,4 @@
 import pandas as pd
-import numpy as np
 import os
 from sqlalchemy import create_engine
 from urllib.parse import quote_plus
@@ -56,14 +55,48 @@ print(df[['product_name', 'category', 'Stars', 'Reviews', 'Price', 'Discount_Buc
 print("\nAggregated Data Sample:")
 print(agg_df.head())
 
-# Load: Push to PostgreSQL
+# Load: Push to PostgreSQL with intelligent fallback
 print(f"Connecting to PostgreSQL at {db_host}:{db_port}")
-engine = create_engine(f'postgresql://{db_user}:{encoded_password}@{db_host}:{db_port}/{db_name}')
 
-try:
-    df.to_sql('raw_products', engine, if_exists='replace', index=False)
-    agg_df.to_sql('discount_analysis', engine, if_exists='replace', index=False)
-    print("Data loaded to PostgreSQL successfully.")
-except Exception as e:
-    print(f"Error loading data to PostgreSQL: {e}")
-    raise
+# Try multiple connection methods for robustness
+connection_attempts = [
+    f'postgresql://{db_user}:{encoded_password}@{db_host}:{db_port}/{db_name}',  # Docker network
+    f'postgresql://{db_user}:{encoded_password}@localhost:5433/{db_name}',       # Host network with specified db
+    f'postgresql://{db_user}:{encoded_password}@localhost:5433/mydb'             # Host network with default db
+]
+
+engine = None
+for i, connection_string in enumerate(connection_attempts, 1):
+    try:
+        print(f"Attempting connection {i}: {connection_string.split('@')[1]}")
+        engine = create_engine(connection_string)
+        # Test the connection
+        with engine.connect() as conn:
+            from sqlalchemy import text
+            conn.execute(text("SELECT 1"))
+        print("✅ Successfully connected to PostgreSQL")
+        break
+    except Exception as e:
+        print(f"❌ Connection attempt {i} failed: {e}")
+        if i == len(connection_attempts):
+            print("❌ All connection attempts failed")
+            engine = None
+
+if engine:
+    try:
+        # Load raw data to PostgreSQL
+        df.to_sql('raw_products', engine, if_exists='replace', index=False)
+        print("✅ Raw data loaded to PostgreSQL")
+
+        # Load aggregated data to PostgreSQL
+        agg_df.to_sql('discount_analysis', engine, if_exists='replace', index=False)
+        print("✅ Aggregated data loaded to PostgreSQL")
+
+        print("🎉 Amazon product data loaded to PostgreSQL successfully.")
+
+    except Exception as e:
+        print(f"Error loading data to PostgreSQL: {e}")
+        print("💾 Data saved locally as backup")
+else:
+    print("💾 Could not connect to database. Data processed but not saved to PostgreSQL.")
+    print("💾 Data saved locally as backup")
