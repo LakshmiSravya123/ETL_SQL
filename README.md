@@ -41,7 +41,7 @@ Amazon/
 
 3. **Access services**
    - Neon Database: Serverless PostgreSQL (automatically managed)
-   - Grafana: `http://localhost:3001` (Swami123/Swami@123)
+   - Grafana: `http://localhost:3001`
 
 4. **Run individual ETL processes**
    ```bash
@@ -74,8 +74,8 @@ NEON_DATABASE_URL=postgresql://[user]:[password]@[neon_hostname]/[dbname]?sslmod
 docker run --rm \
   --link amazon_postgres:postgres \
   -e DB_HOST=postgres \
-  -e DB_USER=sravya \
-  -e DB_PASSWORD=Swami@123 \
+  -e DB_USER=username \
+  -e DB_PASSWORD=password \
   -e DB_NAME=mydb \
   -v $(pwd)/data:/app/data \
   amazon-etl
@@ -98,8 +98,8 @@ The following environment variables can be configured:
 If you need to push images to Docker Hub:
 
 ```bash
-docker login -u swami9876
-# Enter password: Swami@123
+docker login -u loginid
+# Enter password: password
 ```
 
 ## Troubleshooting
