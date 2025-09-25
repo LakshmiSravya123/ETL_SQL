@@ -1,6 +1,6 @@
-# Amazon ETL Docker Setup
+# Amazon ETL with Neon Database
 
-This project contains a containerized ETL pipeline for processing Amazon product data and storing it in PostgreSQL with Grafana visualization.
+This project contains a containerized ETL pipeline for processing Amazon product data and storing it in Neon Database (serverless PostgreSQL) with Grafana visualization.
 
 ## Prerequisites
 
@@ -37,7 +37,7 @@ Amazon/
    ```
 
 3. **Access services**
-   - PostgreSQL: `localhost:5433` (external port, avoids conflict with local PostgreSQL)
+   - Neon Database: Serverless PostgreSQL (automatically managed)
    - Grafana: `http://localhost:3001` (Swami123/Swami@123)
 
 4. **Run individual ETL processes**
@@ -59,15 +59,11 @@ Amazon/
 docker build -t amazon-etl .
 ```
 
-### 2. Run PostgreSQL container
+### 2. Neon Database Setup
+The project now uses Neon Database (serverless PostgreSQL). No local PostgreSQL container is needed.
+Configure your Neon connection string in the `.env` file:
 ```bash
-docker run -d \
-  --name amazon_postgres \
-  -e POSTGRES_DB=mydb \
-  -e POSTGRES_USER=sravya \
-  -e POSTGRES_PASSWORD=Swami@123 \
-  -p 5433:5432 \
-  postgres:15
+NEON_DATABASE_URL=postgresql://[user]:[password]@[neon_hostname]/[dbname]?sslmode=require&channel_binding=require
 ```
 
 ### 3. Run ETL container
@@ -86,10 +82,11 @@ docker run --rm \
 
 The following environment variables can be configured:
 
-- `DB_HOST`: Database hostname (default: postgres)
-- `DB_USER`: Database username (default: sravya)
-- `DB_PASSWORD`: Database password (default: Swami@123)
-- `DB_NAME`: Database name (default: mydb)
+- `NEON_DATABASE_URL`: Complete Neon database connection string
+- `DB_HOST`: Neon database hostname
+- `DB_USER`: Neon database username
+- `DB_PASSWORD`: Neon database password
+- `DB_NAME`: Neon database name
 - `DB_PORT`: Database port (default: 5432)
 - `CSV_PATH`: Path to CSV file (default: ./data/amazon.csv)
 

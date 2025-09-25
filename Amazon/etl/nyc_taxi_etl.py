@@ -5,11 +5,12 @@ from sqlalchemy import create_engine
 import pyarrow.parquet as pq
 from urllib.parse import quote_plus
 import os
-# Get database credentials from environment variables
-db_host = os.getenv('DB_HOST', 'postgres')
-db_user = os.getenv('DB_USER', 'sravya')
-db_password = os.getenv('DB_PASSWORD', 'Swami@123')
-db_name = os.getenv('DB_NAME', 'nyc_taxi')  # Use existing database
+# Get Neon database credentials from environment variables
+neon_url = os.getenv('NEON_DATABASE_URL')
+db_host = os.getenv('DB_HOST', 'ep-morning-sea-adg9dt1l-pooler.c-2.us-east-1.aws.neon.tech')
+db_user = os.getenv('DB_USER', 'neondb_owner')
+db_password = os.getenv('DB_PASSWORD', 'npg_9hJsgiHw7GAo')
+db_name = os.getenv('DB_NAME', 'neondb')  # Use Neon database
 db_port = os.getenv('DB_PORT', '5432')
 encoded_password = quote_plus(db_password)
 
@@ -96,15 +97,14 @@ zonal_agg = df.groupby(['pickup_location_id', 'pickup_month', 'Season']).agg({
 print("Sample raw data:")
 print(df[['tpep_pickup_datetime', 'pickup_location_id', 'fare_amount', 'Season', 'pickup_hour']].head())
 
-# Load: Push to PostgreSQL
-print(f"Connecting to PostgreSQL at {db_host}:{db_port}")
+# Load: Push to Neon Database
+print(f"Connecting to Neon Database at {db_host}")
 
-# Try Docker network connection first, then fallback to localhost
-connection_attempts = [
-    f'postgresql://{db_user}:{encoded_password}@{db_host}:{db_port}/{db_name}',  # Docker network
-    f'postgresql://{db_user}:{encoded_password}@localhost:5433/{db_name}',       # Host network with specified db
-    f'postgresql://{db_user}:{encoded_password}@localhost:5433/mydb'             # Host network with default db
-]
+# Try Neon connection with fallback
+connection_attempts = []
+if neon_url:
+    connection_attempts.append(neon_url)  # Direct Neon URL from environment
+connection_attempts.append(f'postgresql://{db_user}:{encoded_password}@{db_host}:{db_port}/{db_name}?sslmode=require&channel_binding=require')  # Constructed Neon URL
 
 engine = None
 for connection_string in connection_attempts:

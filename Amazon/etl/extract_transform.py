@@ -3,11 +3,12 @@ import os
 from sqlalchemy import create_engine
 from urllib.parse import quote_plus
 
-# Get database credentials from environment variables
-db_host = os.getenv('DB_HOST', 'postgres')
-db_user = os.getenv('DB_USER', 'sravya')
-db_password = os.getenv('DB_PASSWORD', 'Swami@123')
-db_name = os.getenv('DB_NAME', 'mydb')
+# Get Neon database credentials from environment variables
+neon_url = os.getenv('NEON_DATABASE_URL')
+db_host = os.getenv('DB_HOST', 'ep-morning-sea-adg9dt1l-pooler.c-2.us-east-1.aws.neon.tech')
+db_user = os.getenv('DB_USER', 'neondb_owner')
+db_password = os.getenv('DB_PASSWORD', 'npg_9hJsgiHw7GAo')
+db_name = os.getenv('DB_NAME', 'neondb')
 db_port = os.getenv('DB_PORT', '5432')
 
 # Get CSV file path from environment variable
@@ -55,15 +56,14 @@ print(df[['product_name', 'category', 'Stars', 'Reviews', 'Price', 'Discount_Buc
 print("\nAggregated Data Sample:")
 print(agg_df.head())
 
-# Load: Push to PostgreSQL with intelligent fallback
-print(f"Connecting to PostgreSQL at {db_host}:{db_port}")
+# Load: Push to Neon Database with fallback
+print(f"Connecting to Neon Database at {db_host}")
 
-# Try multiple connection methods for robustness
-connection_attempts = [
-    f'postgresql://{db_user}:{encoded_password}@{db_host}:{db_port}/{db_name}',  # Docker network
-    f'postgresql://{db_user}:{encoded_password}@localhost:5433/{db_name}',       # Host network with specified db
-    f'postgresql://{db_user}:{encoded_password}@localhost:5433/mydb'             # Host network with default db
-]
+# Try Neon connection with fallback
+connection_attempts = []
+if neon_url:
+    connection_attempts.append(neon_url)  # Direct Neon URL from environment
+connection_attempts.append(f'postgresql://{db_user}:{encoded_password}@{db_host}:{db_port}/{db_name}?sslmode=require&channel_binding=require')  # Constructed Neon URL
 
 engine = None
 for i, connection_string in enumerate(connection_attempts, 1):
