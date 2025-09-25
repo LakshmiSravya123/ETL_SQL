@@ -6,40 +6,48 @@ import time
 import os
 from datetime import datetime
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+    print("✅ Loaded environment variables from .env file")
+except ImportError:
+    print("⚠️  python-dotenv not installed. Using system environment variables only.")
+    print("   Install with: pip install python-dotenv")
+
 # Elasticsearch Setup
 print("🔌 Connecting to Elasticsearch...")
 
-# Get configuration from environment variables (optional)
-ES_HOST = os.getenv('ELASTICSEARCH_HOST', 'http://localhost:9200')
-ES_USERNAME = os.getenv('ELASTICSEARCH_USERNAME', 'elastic')
-ES_PASSWORD = os.getenv('ELASTICSEARCH_PASSWORD', 'BII3iKRTigPZX0Cm4Fiyq9YO')
+# Get configuration from environment variables
+ES_HOST = os.getenv('ELASTICSEARCH_HOST')
+ES_USERNAME = os.getenv('ELASTICSEARCH_USERNAME')
+ES_PASSWORD = os.getenv('ELASTICSEARCH_PASSWORD')
+
+print(f"🔧 Configuration loaded:")
+print(f"   Host: {ES_HOST}")
+print(f"   Username: {ES_USERNAME}")
+print(f"   Password: {'*' * len(ES_PASSWORD) if ES_PASSWORD else 'Not set'}")
 
 # Configuration options - modify these for your setup
-ELASTICSEARCH_CONFIGS = [
-    # Option 1: Local Elasticsearch (no auth)
-    {
-        "hosts": ['http://localhost:9200'],
-        "verify_certs": False,
-        "request_timeout": 30,
-        "description": "Local Elasticsearch (no auth)"
-    },
-    # Option 2: Local Elasticsearch (with auth)
-    {
-        "hosts": ['http://localhost:9200'],
-        "basic_auth": ('elastic', 'BII3iKRTigPZX0Cm4Fiyq9YO'),
-        "verify_certs": False,
-        "request_timeout": 30,
-        "description": "Local Elasticsearch (with auth)"
-    },
-    # Option 3: Environment-based configuration
-    {
+ELASTICSEARCH_CONFIGS = []
+
+# Add environment-based configuration if available
+if ES_HOST and ES_USERNAME and ES_PASSWORD:
+    ELASTICSEARCH_CONFIGS.append({
         "hosts": [ES_HOST],
-        "basic_auth": (ES_USERNAME, ES_PASSWORD) if ES_USERNAME and ES_PASSWORD else None,
-        "verify_certs": ES_HOST.startswith('https://'),
+        "basic_auth": (ES_USERNAME, ES_PASSWORD),
+        "verify_certs": ES_HOST.startswith('https://') if ES_HOST else True,
         "request_timeout": 30,
         "description": f"Environment config ({ES_HOST})"
-    }
-]
+    })
+
+# Add local Elasticsearch as fallback
+ELASTICSEARCH_CONFIGS.append({
+    "hosts": ['http://localhost:9200'],
+    "verify_certs": False,
+    "request_timeout": 30,
+    "description": "Local Elasticsearch (fallback)"
+})
 
 # Filter out None basic_auth
 for config in ELASTICSEARCH_CONFIGS:
@@ -53,9 +61,24 @@ for i, config in enumerate(ELASTICSEARCH_CONFIGS, 1):
         description = config.pop('description')  # Remove description from config
         es = Elasticsearch(**config)
 
-        # Test connection
-        info = es.info()
-        print(f"✅ Connected to Elasticsearch {info['version']['number']} ({description})")
+        # Test connection with a simpler operation first
+        try:
+            # Try to get cluster info (requires cluster:monitor/main permission)
+            info = es.info()
+            print(f"✅ Connected to Elasticsearch {info['version']['number']} ({description})")
+        except Exception as auth_error:
+            if "unauthorized" in str(auth_error).lower():
+                print(f"⚠️  Connected but limited permissions ({description})")
+                print("   Trying index operations instead...")
+                # Test with a simple index operation
+                try:
+                    es.indices.exists(index='test')
+                    print(f"✅ Index operations work ({description})")
+                except:
+                    print(f"❌ Index operations also failed ({description})")
+                    continue
+            else:
+                raise auth_error
         break
 
     except Exception as e:
@@ -66,8 +89,22 @@ if es is None:
     print("❌ All Elasticsearch connection attempts failed!")
     print("\n💡 To fix this:")
     print("1. For local Elasticsearch: Make sure it's running on localhost:9200")
-    print("2. For Elasticsearch Cloud: Update the script with your actual endpoint and credentials")
+    print("2. For Elasticsearch Cloud:")
+    print("   - Check your endpoint and credentials are correct")
+    print("   - Ensure the user has proper roles assigned")
+    print("   - Try using the 'elastic' superuser instead")
     print("3. Check your network connection and firewall settings")
+    print("\n🔧 Current configuration:")
+    print(f"   Host: {ES_HOST}")
+    print(f"   Username: {ES_USERNAME}")
+    print("   Password: [HIDDEN]")
+
+    if ES_USERNAME and ES_USERNAME != 'elastic':
+        print(f"\n⚠️  User '{ES_USERNAME}' appears to have no roles assigned.")
+        print("   Try updating .env to use:")
+        print("   ELASTICSEARCH_USERNAME=elastic")
+        print("   ELASTICSEARCH_PASSWORD=your-elastic-user-password")
+
     exit(1)
 
 index_name = 'finnhub_stocks'

@@ -29,6 +29,7 @@ show_usage() {
     echo "  nyc       Run only the NYC Taxi ETL process (Docker)"
     echo "  nyc-local Run NYC Taxi ETL directly on host"
     echo "  finnhub   Run Finnhub stock ETL to Elasticsearch"
+    echo "  setup-es  Setup Elasticsearch Cloud connection"
     echo "  clean     Remove all containers and volumes"
     echo "  status    Show status of all services"
     echo ""
@@ -74,6 +75,10 @@ case "${1:-up}" in
     "finnhub")
         echo "📈 Running Finnhub Stock ETL to Elasticsearch..."
         python etl/finnhub_etl_elasticsearch.py
+        ;;
+    "setup-es")
+        echo "🌐 Setting up Elasticsearch Cloud connection..."
+        python setup_elasticsearch.py
         ;;
     "clean")
         echo "🧹 Cleaning up containers and volumes..."
