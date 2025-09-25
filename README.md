@@ -1,562 +1,168 @@
-# Health Analytics API
+# Amazon ETL with Neon Database
 
-A comprehensive health analytics API built with Vapor, providing endpoints for tracking health metrics, insights, goals, and nutrition.
+This project contains a comprehensive ETL pipeline for processing **Amazon product data** and **NYC taxi trip data**, storing them in Neon Database (serverless PostgreSQL) with Grafana visualization.
 
-## Authentication
+## 📊 **[📈 Comprehensive Data Analysis →](DATA_ANALYSIS_README.md)**
+*For detailed insights, business intelligence, and data patterns analysis*
 
-All API endpoints (except registration and login) require authentication using Bearer token.
+## Prerequisites
 
-### Register a New User
+- Docker Desktop installed and running
+- Docker Compose installed
 
-```http
-POST /register
-Content-Type: application/json
+## Project Structure
 
-{
-    "name": "John Doe",
-    "email": "john@example.com",
-    "password": "securepassword"
-}
+```
+Amazon/
+├── data/
+│   └── amazon.csv          # Input CSV data
+├── etl/
+│   └── extract_transform.py # ETL script
+├── db/                     # Database initialization scripts
+├── grafana/               # Grafana configuration
+├── Dockerfile             # Docker image definition
+├── docker-compose.yml     # Multi-container setup
+├── requirements.txt       # Python dependencies
+├── .env                   # Environment variables
+└── README.md             # This file
 ```
 
-Success Response:
-```json
-{
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "name": "John Doe",
-    "email": "john@example.com"
-}
-```
+## Quick Start
 
-Error Response (Email already exists):
-```json
-{
-    "error": true,
-    "reason": "A user with this email already exists"
-}
-```
-
-### Login
-
-```http
-POST /login
-Content-Type: application/json
-
-{
-    "email": "john@example.com",
-    "password": "securepassword"
-}
-```
-
-Success Response:
-```json
-{
-    "token": {
-        "id": "550e8400-e29b-41d4-a716-446655440000",
-        "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-    },
-    "user": {
-        "id": "550e8400-e29b-41d4-a716-446655440000",
-        "name": "John Doe",
-        "email": "john@example.com"
-    }
-}
-```
-
-Error Response (Invalid credentials):
-```json
-{
-    "error": true,
-    "reason": "Invalid email or password"
-}
-```
-
-## Health Metrics
-
-### Get Today's Metrics
-
-```http
-GET /api/health/metrics
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
-
-Success Response:
-```json
-{
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "userId": "550e8400-e29b-41d4-a716-446655440000",
-    "date": "2024-03-19T10:30:00Z",
-    "steps": 8500,
-    "heartRate": 72,
-    "sleepHours": 7.5,
-    "caloriesBurned": 2100,
-    "activeMinutes": 35
-}
-```
-
-Error Response (No metrics found):
-```json
-{
-    "error": true,
-    "reason": "No metrics found for today"
-}
-```
-
-### Create Metrics
-
-```http
-POST /api/health/metrics
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-Content-Type: application/json
-
-{
-    "steps": 10000,
-    "heartRate": 75,
-    "sleepHours": 7.5,
-    "caloriesBurned": 2500,
-    "activeMinutes": 45
-}
-```
-
-Success Response:
-```json
-{
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "userId": "550e8400-e29b-41d4-a716-446655440000",
-    "date": "2024-03-19T15:45:00Z",
-    "steps": 10000,
-    "heartRate": 75,
-    "sleepHours": 7.5,
-    "caloriesBurned": 2500,
-    "activeMinutes": 45
-}
-```
-
-### Get Historical Metrics
-
-```http
-GET /api/health/metrics/history?days=7
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
-
-Success Response:
-```json
-[
-    {
-        "id": "550e8400-e29b-41d4-a716-446655440000",
-        "date": "2024-03-19T00:00:00Z",
-        "steps": 10000,
-        "heartRate": 75,
-        "sleepHours": 7.5,
-        "caloriesBurned": 2500,
-        "activeMinutes": 45
-    },
-    {
-        "id": "550e8400-e29b-41d4-a716-446655440001",
-        "date": "2024-03-18T00:00:00Z",
-        "steps": 8500,
-        "heartRate": 72,
-        "sleepHours": 8.0,
-        "caloriesBurned": 2300,
-        "activeMinutes": 40
-    }
-]
-```
-
-### Get Health Statistics
-
-```http
-GET /api/health/metrics/stats
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
-
-Success Response:
-```json
-{
-    "periodDays": 30,
-    "averageSteps": 9200,
-    "averageHeartRate": 73,
-    "averageSleepHours": 7.8,
-    "averageCaloriesBurned": 2400,
-    "averageActiveMinutes": 42
-}
-```
-
-## Health Insights
-
-### Get Today's Insights
-
-```http
-GET /api/health/insights
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
-
-Success Response:
-```json
-{
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "userId": "550e8400-e29b-41d4-a716-446655440000",
-    "date": "2024-03-19T00:00:00Z",
-    "stepsGoalMet": true,
-    "restingHeartRateStatus": "Normal",
-    "sleepQuality": "Good",
-    "activityLevel": "Active",
-    "recommendations": [
-        "Keep up the good work!",
-        "Try to get 8 hours of sleep tonight",
-        "Consider taking a walk after lunch"
-    ]
-}
-```
-
-### Create Insights
-
-```http
-POST /api/health/insights
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-Content-Type: application/json
-
-{
-    "stepsGoalMet": true,
-    "restingHeartRateStatus": "Normal",
-    "sleepQuality": "Good",
-    "activityLevel": "Active",
-    "recommendations": [
-        "Keep up the good work!",
-        "Try to get 8 hours of sleep tonight"
-    ]
-}
-```
-
-Success Response:
-```json
-{
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "userId": "550e8400-e29b-41d4-a716-446655440000",
-    "date": "2024-03-19T16:30:00Z",
-    "stepsGoalMet": true,
-    "restingHeartRateStatus": "Normal",
-    "sleepQuality": "Good",
-    "activityLevel": "Active",
-    "recommendations": [
-        "Keep up the good work!",
-        "Try to get 8 hours of sleep tonight"
-    ]
-}
-```
-
-## Health Goals
-
-### Get Current Goals
-
-```http
-GET /api/health/goals
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
-
-Success Response:
-```json
-{
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "userId": "550e8400-e29b-41d4-a716-446655440000",
-    "dailyStepsGoal": 10000,
-    "dailyActiveMinutesGoal": 30,
-    "dailyCaloriesGoal": 2500,
-    "sleepHoursGoal": 8.0
-}
-```
-
-### Set Goals
-
-```http
-POST /api/health/goals
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInT5cCI6IkpXVCJ9...
-Content-Type: application/json
-
-{
-    "dailyStepsGoal": 10000,
-    "dailyActiveMinutesGoal": 30,
-    "dailyCaloriesGoal": 2500,
-    "sleepHoursGoal": 8.0
-}
-```
-
-Success Response:
-```json
-{
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "userId": "550e8400-e29b-41d4-a716-446655440000",
-    "dailyStepsGoal": 10000,
-    "dailyActiveMinutesGoal": 30,
-    "dailyCaloriesGoal": 2500,
-    "sleepHoursGoal": 8.0,
-    "createdAt": "2024-03-19T16:30:00Z",
-    "updatedAt": "2024-03-19T16:30:00Z"
-}
-```
-
-### Get Progress Report
-
-```http
-GET /api/health/goals/progress
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
-
-Success Response:
-```json
-{
-    "period": "Last 7 days",
-    "stepsProgress": 0.92,
-    "activeMinutesProgress": 1.15,
-    "caloriesProgress": 0.95,
-    "sleepProgress": 0.94
-}
-```
-
-## Nutrition Tracking
-
-### Get Today's Meals
-
-```http
-GET /api/health/meals
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
-
-Success Response:
-```json
-[
-    {
-        "id": "550e8400-e29b-41d4-a716-446655440000",
-        "userId": "550e8400-e29b-41d4-a716-446655440000",
-        "name": "Breakfast",
-        "date": "2024-03-19T08:00:00Z",
-        "calories": 450,
-        "protein": 15,
-        "carbs": 65,
-        "fat": 12,
-        "foodItems": [
-            {
-                "id": "550e8400-e29b-41d4-a716-446655440001",
-                "name": "Oatmeal",
-                "calories": 150,
-                "protein": 6,
-                "carbs": 27,
-                "fat": 3,
-                "servingSize": "1 cup"
-            },
-            {
-                "id": "550e8400-e29b-41d4-a716-446655440002",
-                "name": "Banana",
-                "calories": 105,
-                "protein": 1.3,
-                "carbs": 27,
-                "fat": 0.4,
-                "servingSize": "1 medium"
-            }
-        ]
-    }
-]
-```
-
-### Log a Meal
-
-```http
-POST /api/health/meals
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-Content-Type: application/json
-
-{
-    "name": "Breakfast",
-    "foodItems": [
-        {
-            "name": "Oatmeal",
-            "calories": 150,
-            "protein": 6.0,
-            "carbs": 27.0,
-            "fat": 3.0,
-            "servingSize": "1 cup"
-        },
-        {
-            "name": "Banana",
-            "calories": 105,
-            "protein": 1.3,
-            "carbs": 27.0,
-            "fat": 0.4,
-            "servingSize": "1 medium"
-        }
-    ]
-}
-```
-
-Success Response:
-```json
-{
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "userId": "550e8400-e29b-41d4-a716-446655440000",
-    "name": "Breakfast",
-    "date": "2024-03-19T08:00:00Z",
-    "calories": 255,
-    "protein": 7.3,
-    "carbs": 54.0,
-    "fat": 3.4,
-    "foodItems": [
-        {
-            "id": "550e8400-e29b-41d4-a716-446655440001",
-            "name": "Oatmeal",
-            "calories": 150,
-            "protein": 6.0,
-            "carbs": 27.0,
-            "fat": 3.0,
-            "servingSize": "1 cup"
-        },
-        {
-            "id": "550e8400-e29b-41d4-a716-446655440002",
-            "name": "Banana",
-            "calories": 105,
-            "protein": 1.3,
-            "carbs": 27.0,
-            "fat": 0.4,
-            "servingSize": "1 medium"
-        }
-    ]
-}
-```
-
-## Error Handling
-
-All endpoints return appropriate HTTP status codes:
-
-### Common Error Responses
-
-#### Authentication Error (401)
-```json
-{
-    "error": true,
-    "reason": "Invalid or expired authentication token"
-}
-```
-
-#### Validation Error (400)
-```json
-{
-    "error": true,
-    "reason": "Invalid request parameters",
-    "validationErrors": [
-        "steps must be a positive number",
-        "heartRate must be between 40 and 200"
-    ]
-}
-```
-
-#### Resource Not Found (404)
-```json
-{
-    "error": true,
-    "reason": "Requested resource not found"
-}
-```
-
-#### Rate Limit Exceeded (429)
-```json
-{
-    "error": true,
-    "reason": "Rate limit exceeded. Try again in 60 seconds",
-    "retryAfter": 60
-}
-```
-
-## Rate Limiting
-
-The API implements rate limiting of 100 requests per minute per user. Rate limit information is included in response headers:
-
-```http
-X-RateLimit-Limit: 100
-X-RateLimit-Remaining: 95
-X-RateLimit-Reset: 1623456789
-```
-
-## Data Retention
-
-- Metrics data is retained for 1 year
-- Daily insights are retained for 90 days
-- Meal logs are retained for 1 year
-
-## Best Practices
-
-1. Always include the Authorization header with a valid token
-2. Use appropriate HTTP methods for different operations
-3. Handle rate limiting by implementing exponential backoff
-4. Implement proper error handling in your client application
-5. Keep your authentication token secure
-6. Cache responses when appropriate
-7. Use compression for large requests/responses
-8. Implement retry logic for failed requests
-9. Monitor API usage and response times
-10. Keep your client libraries up to date
-
-## Development Setup
-
-1. Install Swift and Vapor:
+1. **Start Docker Desktop**
    ```bash
-   brew install vapor
+   open -a Docker  # On macOS
    ```
 
-2. Clone the repository:
+2. **Build and run the containers**
    ```bash
-   git clone https://github.com/yourusername/health-analytics.git
-   cd health-analytics
+   docker-compose up --build
    ```
 
-3. Install dependencies:
+3. **Access services**
+   - Neon Database: Serverless PostgreSQL (automatically managed)
+   - Grafana: `http://localhost:3001` (Swami123/Swami@123)
+
+4. **Run individual ETL processes**
    ```bash
-   swift package resolve
+   # Run Amazon product ETL
+   ./run.sh etl
+
+   # Run NYC Taxi ETL (Docker)
+   ./run.sh nyc
+
+   # Run NYC Taxi ETL (directly on host)
+   ./run.sh nyc-local
    ```
 
-4. Configure environment variables in `.env`:
-   ```env
-   JWT_SECRET=your-secret-key
-   DATABASE_URL=your-database-url
-   ENVIRONMENT=development
-   PORT=8080
-   LOG_LEVEL=debug
-   ```
+## Manual Steps
 
-5. Run the server:
-   ```bash
-   swift run
-   ```
-
-## Testing
-
-Run the test suite:
+### 1. Build the Docker image
 ```bash
-swift test
+docker build -t amazon-etl .
 ```
 
-Run with coverage:
+### 2. Neon Database Setup
+The project now uses Neon Database (serverless PostgreSQL). No local PostgreSQL container is needed.
+Configure your Neon connection string in the `.env` file:
 ```bash
-swift test --enable-code-coverage
+NEON_DATABASE_URL=postgresql://[user]:[password]@[neon_hostname]/[dbname]?sslmode=require&channel_binding=require
 ```
 
-## API Versioning
-
-The API uses URL versioning. The current version is v1:
-```http
-https://api.example.com/v1/health/metrics
+### 3. Run ETL container
+```bash
+docker run --rm \
+  --link amazon_postgres:postgres \
+  -e DB_HOST=postgres \
+  -e DB_USER=sravya \
+  -e DB_PASSWORD=Swami@123 \
+  -e DB_NAME=mydb \
+  -v $(pwd)/data:/app/data \
+  amazon-etl
 ```
 
-Future versions will be available at `/v2`, `/v3`, etc.
+## Environment Variables
 
-## Support
+The following environment variables can be configured:
 
-For API support, please email:
-- Technical issues: api-support@example.com
-- Account issues: account-support@example.com
+- `NEON_DATABASE_URL`: Complete Neon database connection string
+- `DB_HOST`: Neon database hostname
+- `DB_USER`: Neon database username
+- `DB_PASSWORD`: Neon database password
+- `DB_NAME`: Neon database name
+- `DB_PORT`: Database port (default: 5432)
+- `CSV_PATH`: Path to CSV file (default: ./data/amazon.csv)
 
-## Rate Plans
+## Docker Login (Optional)
 
-| Plan | Requests/minute | Historical Data | Price |
-|------|----------------|-----------------|--------|
-| Basic | 100 | 30 days | Free |
-| Pro | 1000 | 1 year | $29/month |
-| Enterprise | Custom | Custom | Contact us | 
+If you need to push images to Docker Hub:
+
+```bash
+docker login -u swami9876
+# Enter password: Swami@123
+```
+
+## Troubleshooting
+
+1. **Docker daemon not running**
+   - Start Docker Desktop application
+   - Wait for Docker to fully initialize
+
+2. **Permission denied errors**
+   - Ensure Docker Desktop has proper permissions
+   - Try running with `sudo` if on Linux
+
+3. **Port conflicts**
+   - Check if ports 5432 or 3000 are already in use
+   - Modify port mappings in docker-compose.yml if needed
+
+4. **CSV file not found**
+   - Ensure `amazon.csv` exists in the `data/` directory
+   - Check file permissions
+
+## Database Tables
+
+### Amazon ETL Tables
+- `raw_products`: Contains all processed Amazon product data (1,463 records)
+- `discount_analysis`: Contains aggregated discount analysis (339 records)
+
+### NYC Taxi ETL Tables
+- `raw_trips`: Contains taxi trip data (1,000 sample records)
+- `hourly_analysis`: Contains trip patterns by hour (24 records)
+- `zonal_analysis`: Contains trip patterns by pickup zone (265+ records)
+
+## 📊 Data Insights & Analysis
+
+This ETL pipeline processes two distinct datasets providing valuable business insights:
+
+### 🛍️ Amazon Product Data Analysis
+- **1,463 products** across electronics and accessories categories
+- **Discount Analysis**: 58% of products offer >50% discounts
+- **Customer Satisfaction**: 89% of products rated 4+ stars
+- **Price Range**: Most products between ₹150-₹500
+- **Top Categories**: USB cables, charging accessories, networking devices
+
+### 🚕 NYC Taxi Trip Analysis
+- **1,000 trip records** with temporal and geographical patterns
+- **Peak Hours**: 8-9 AM and 6-7 PM show highest demand
+- **Fare Patterns**: Airport trips average 40% higher fares
+- **Zone Coverage**: 265+ unique pickup locations across NYC
+- **Seasonal Trends**: Spring data shows consistent demand patterns
+
+**[📈 View Complete Data Analysis →](DATA_ANALYSIS_README.md)**
+
+### NYC Taxi ETL Tables
+- `raw_trips`: Contains processed taxi trip data
+- `hourly_analysis`: Contains hourly aggregated trip statistics
+- `zonal_analysis`: Contains zone-based trip analysis
+
+## Stopping Services
+
+```bash
+docker-compose down
+```
+
+To remove volumes as well:
+```bash
+docker-compose down -v
+```
