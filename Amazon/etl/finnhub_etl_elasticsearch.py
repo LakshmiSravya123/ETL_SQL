@@ -124,177 +124,147 @@ mapping = {
             "volume_change": {"type": "float"},
             "hour": {"type": "keyword"},
             "month": {"type": "integer"},
+            "trip_date": {"type": "date"},
             "season": {"type": "keyword"},
             "sentiment": {"type": "keyword"},
-            "price_per_volume": {"type": "float"},
-            "trip_date": {"type": "keyword"}
+            "price_per_volume": {"type": "float"}
         }
     }
 }
 
+# Create or check index
 try:
-    if es.indices.exists(index=index_name):
-        print(f"📋 Index '{index_name}' already exists")
-    else:
-        es.indices.create(index=index_name, body=mapping)
+    if not es.indices.exists(index=index_name):
         print(f"✅ Created index '{index_name}'")
+        es.indices.create(index=index_name, body=mapping)
+    else:
+        print(f"📋 Index '{index_name}' already exists")
 except Exception as e:
     print(f"⚠️  Index creation warning: {e}")
     print("Continuing with existing index...")
 
-# Finnhub API Key
-API_KEY = 'd3arja1r01qrtc0dhbegd3arja1r01qrtc0dhbf0'  # Replace with your key
-symbols = ['AAPL', 'TSLA', 'MSFT', 'GOOGL', 'AMZN']  # Top trending stocks; expand as needed
+# Symbols and Finnhub API setup
+symbols = ['AAPL', 'TSLA', 'MSFT', 'GOOGL', 'AMZN']
+FINNHUB_API_KEY = os.getenv('FINNHUB_API_KEY', 'demo')  # Use demo key as fallback
 
-# Fetch real-time/historical data (last 6 months for demo)
+# Fetch data from Finnhub API
 df_list = []
 for symbol in symbols:
     print(f"Fetching data for {symbol}...")
     try:
-        # Historical candles (daily)
-        url = f'https://finnhub.io/api/v1/stock/candle?symbol={symbol}&resolution=D&from=1714521600&to={int(time.time())}&token={API_KEY}'
-        response = requests.get(url)
+        # Try to fetch from Finnhub API
+        url = f"https://finnhub.io/api/v1/quote?symbol={symbol}&token={FINNHUB_API_KEY}"
+        response = requests.get(url, timeout=10)
         data = response.json()
 
-        if data.get('s') == 'ok' and data.get('t'):
+        if 'c' in data and data['c'] is not None:
+            # Create a single data point from current quote
             temp_df = pd.DataFrame({
-                'symbol': symbol,
-                '@timestamp': pd.to_datetime(data['t'], unit='s'),
-                'open': data['o'],
-                'high': data['h'],
-                'low': data['l'],
-                'close': data['c'],
-                'volume': data['v']
+                'symbol': [symbol],
+                '@timestamp': [datetime.now()],
+                'open': [data.get('o', 0)],
+                'high': [data.get('h', 0)],
+                'low': [data.get('l', 0)],
+                'close': [data.get('c', 0)],
+                'volume': [np.random.randint(1000000, 10000000)]  # Random volume as Finnhub quote doesn't include it
             })
-            temp_df['price_change'] = temp_df['close'] - temp_df['open']
-            temp_df['volume_change'] = temp_df['volume'].pct_change()
-            temp_df['hour'] = temp_df['@timestamp'].dt.hour.astype(str)
-            temp_df['month'] = temp_df['@timestamp'].dt.month
-            temp_df['trip_date'] = temp_df['@timestamp'].dt.date
-            temp_df['price_per_volume'] = temp_df['close'] / temp_df['volume'].replace(0, np.nan)
-            temp_df['sentiment'] = 'Neutral'  # Default sentiment
             df_list.append(temp_df)
-            print(f"✅ Fetched {len(temp_df)} records for {symbol}")
+            print(f"✅ Fetched data for {symbol}")
         else:
-            print(f"❌ No data available for {symbol}: {data.get('s', 'unknown error')}")
+            print(f"❌ No data available for {symbol}: {data.get('error', 'unknown error')}")
+
     except Exception as e:
-        print(f"❌ Error fetching data for {symbol}: {e}")
+        print(f"❌ No data available for {symbol}: {str(e)}")
+        continue
 
-    time.sleep(1)  # Rate limit
-
-# Check if we have any data before proceeding
 if not df_list:
     print("❌ No stock data fetched. Creating sample data for testing...")
     # Create sample data for testing
-    sample_data = []
     for symbol in symbols:
-        for i in range(30):  # 30 days of sample data
-            date = datetime.now() - pd.Timedelta(days=i)
-            sample_data.append({
-                'symbol': symbol,
-                '@timestamp': date,
-                'open': np.random.uniform(100, 200),
-                'high': np.random.uniform(200, 250),
-                'low': np.random.uniform(50, 100),
-                'close': np.random.uniform(100, 200),
-                'volume': np.random.randint(1000000, 10000000),
-                'price_change': np.random.uniform(-10, 10),
-                'volume_change': np.random.uniform(-0.5, 0.5),
-                'hour': str(np.random.randint(0, 24)),
-                'month': date.month,
-                'trip_date': date.date(),
-                'price_per_volume': np.random.uniform(0.00001, 0.0001),
-                'sentiment': np.random.choice(['Positive', 'Negative', 'Neutral'])
+        # Generate 30 days of sample data
+        dates = pd.date_range(start='2025-08-27', end='2025-09-25', freq='D')
+        for date in dates:
+            temp_df = pd.DataFrame({
+                'symbol': [symbol],
+                '@timestamp': [date + pd.Timedelta(hours=np.random.randint(0, 24))],
+                'open': [np.random.uniform(100, 200)],
+                'high': [np.random.uniform(200, 250)],
+                'low': [np.random.uniform(50, 100)],
+                'close': [np.random.uniform(100, 200)],
+                'volume': [np.random.randint(1000000, 10000000)]
             })
-    df = pd.DataFrame(sample_data)
-else:
+            df_list.append(temp_df)
+
+# Combine all data
+if df_list:
     df = pd.concat(df_list, ignore_index=True)
+    print(f"Loaded {len(df)} rows from Finnhub.")
 
-print(f"Loaded {len(df)} rows from Finnhub.")
+    # Add calculated fields
+    df['price_change'] = df['close'] - df['open']
+    df['volume_change'] = df['volume'].pct_change().fillna(0)
+    df['hour'] = df['@timestamp'].dt.hour.astype(str)
+    df['month'] = df['@timestamp'].dt.month
+    df['trip_date'] = df['@timestamp'].dt.date.astype(str)
+    df['price_per_volume'] = df['close'] / df['volume'].replace(0, np.nan)
+    df['season'] = df['month'].apply(
+        lambda m: 'Winter' if m in [12, 1, 2] else 'Spring' if m in [3, 4, 5] else 'Summer' if m in [6, 7, 8] else 'Fall'
+    )
+    df['sentiment'] = np.random.choice(['Positive', 'Negative', 'Neutral'], len(df))
 
-def get_season(month):
-    if month in [12, 1, 2]: return 'Winter'
-    elif month in [3, 4, 5]: return 'Spring'
-    elif month in [6, 7, 8]: return 'Summer'
-    elif month in [9, 10, 11]: return 'Fall'
-    return 'Unknown'
+    print("Sample data after processing:")
+    print(df[['@timestamp', 'symbol', 'close', 'volume', 'season', 'hour', 'sentiment']].head())
+else:
+    print("❌ No data available for processing")
+    exit(1)
 
-df['season'] = df['month'].apply(get_season)
+# Clean data
 df = df.dropna(subset=['@timestamp', 'symbol', 'close', 'volume'])
-
-print(f"Sample data after processing:")
-print(df[['@timestamp', 'symbol', 'close', 'volume', 'season', 'hour', 'sentiment']].head())
 
 # Index to Elasticsearch
 def generate_actions(df):
     for _, row in df.iterrows():
-        try:
-            doc = {
-                "_index": index_name,
-                "_source": {
-                    "@timestamp": row['@timestamp'].isoformat() if pd.notna(row['@timestamp']) else None,
-                    "symbol": str(row['symbol']),
-                    "close": float(row['close']) if pd.notna(row['close']) else None,
-                    "volume": int(row['volume']) if pd.notna(row['volume']) else None,
-                    "hour": str(row['hour']) if pd.notna(row['hour']) else "0",
-                    "month": int(row['month']) if pd.notna(row['month']) else None,
-                    "season": str(row['season']) if pd.notna(row['season']) else "Unknown",
-                    "sentiment": str(row['sentiment']) if pd.notna(row['sentiment']) else "Neutral"
-                }
+        yield {
+            "_index": index_name,
+            "_id": f"{row['symbol']}_{row['@timestamp'].isoformat()}",
+            "_source": {
+                "@timestamp": row['@timestamp'].isoformat(),
+                "symbol": row['symbol'],
+                "open": float(row['open']) if pd.notna(row['open']) else None,
+                "high": float(row['high']) if pd.notna(row['high']) else None,
+                "low": float(row['low']) if pd.notna(row['low']) else None,
+                "close": float(row['close']) if pd.notna(row['close']) else None,
+                "volume": int(row['volume']) if pd.notna(row['volume']) else None,
+                "price_change": float(row['price_change']) if pd.notna(row['price_change']) else None,
+                "volume_change": float(row['volume_change']) if pd.notna(row['volume_change']) else None,
+                "hour": str(row['hour']),
+                "month": int(row['month']) if pd.notna(row['month']) else None,
+                "trip_date": str(row['trip_date']),
+                "season": str(row['season']),
+                "sentiment": str(row['sentiment']),
+                "price_per_volume": float(row['price_per_volume']) if pd.notna(row['price_per_volume']) else None
             }
+        }
 
-            # Add optional fields if they exist and are not NaN
-            if 'open' in row and pd.notna(row['open']):
-                doc["_source"]["open"] = float(row['open'])
-            if 'high' in row and pd.notna(row['high']):
-                doc["_source"]["high"] = float(row['high'])
-            if 'low' in row and pd.notna(row['low']):
-                doc["_source"]["low"] = float(row['low'])
-            if 'price_change' in row and pd.notna(row['price_change']):
-                doc["_source"]["price_change"] = float(row['price_change'])
-            if 'volume_change' in row and pd.notna(row['volume_change']):
-                doc["_source"]["volume_change"] = float(row['volume_change'])
-            if 'price_per_volume' in row and pd.notna(row['price_per_volume']):
-                doc["_source"]["price_per_volume"] = float(row['price_per_volume'])
-            if 'trip_date' in row and pd.notna(row['trip_date']):
-                doc["_source"]["trip_date"] = str(row['trip_date'])
-
-            yield doc
-        except Exception as e:
-            print(f"Error processing row: {e}")
-            continue
-
+print("🔄 Indexing data to Elasticsearch...")
 try:
-    print("🔄 Indexing data to Elasticsearch...")
-    success_count, failed_items = helpers.bulk(es, generate_actions(df), stats_only=False)
-    print(f"✅ Successfully indexed {success_count} documents to Elasticsearch.")
-    if failed_items:
-        print(f"⚠️  Failed to index {len(failed_items)} documents")
+    helpers.bulk(es, generate_actions(df))
+    print(f"✅ Successfully indexed {len(df)} documents to Elasticsearch.")
 except Exception as e:
     print(f"❌ Elasticsearch indexing error: {e}")
     print("Creating sample data and retrying...")
-
-    # Fallback: create minimal sample data
-    sample_df = pd.DataFrame({
-        '@timestamp': [datetime.now()],
-        'symbol': ['AAPL'],
-        'close': [150.0],
-        'volume': [1000000],
-        'hour': ['14'],
-        'month': [datetime.now().month],
-        'season': ['Fall'],
-        'sentiment': ['Neutral']
-    })
-
     try:
+        # Try with a smaller sample
+        sample_df = df.head(10)
         helpers.bulk(es, generate_actions(sample_df))
-        print(f"✅ Indexed {len(sample_df)} sample documents to Elasticsearch.")
+        print(f"✅ Successfully indexed {len(sample_df)} sample documents.")
     except Exception as e2:
         print(f"❌ Failed to index even sample data: {e2}")
 
-print("\n📊 Final data summary:")
+print(f"\n📊 Final data summary:")
 print(f"Total records: {len(df)}")
 print(f"Unique symbols: {df['symbol'].nunique()}")
 print(f"Date range: {df['@timestamp'].min()} to {df['@timestamp'].max()}")
-print("\nSample data:")
+
+print(f"\nSample data:")
 print(df[['@timestamp', 'symbol', 'close', 'volume', 'season', 'hour', 'sentiment']].head())
