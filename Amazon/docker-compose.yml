@@ -1,0 +1,82 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: amazon_postgres
+    environment:
+      POSTGRES_DB: mydb
+      POSTGRES_USER: sravya
+      POSTGRES_PASSWORD: Swami@123
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sravya -d mydb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - amazon_network
+
+  etl:
+    build: .
+    container_name: amazon_etl
+    environment:
+      DB_HOST: postgres
+      DB_USER: sravya
+      DB_PASSWORD: Swami@123
+      DB_NAME: mydb
+      DB_PORT: 5432
+      CSV_PATH: ./data/amazon.csv
+    volumes:
+      - ./data:/app/data
+      - ./etl:/app/etl
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - amazon_network
+
+  nyc_taxi_etl:
+    build: .
+    container_name: nyc_taxi_etl
+    environment:
+      DB_HOST: postgres
+      DB_USER: sravya
+      DB_PASSWORD: Swami@123
+      DB_NAME: nyc_taxi
+      DB_PORT: 5432
+    volumes:
+      - ./etl:/app/etl
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - amazon_network
+    command: ["python", "etl/nyc_taxi_etl.py"]
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: amazon_grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: swami123
+      GF_SECURITY_ADMIN_PASSWORD: Swami@123
+      GF_SECURITY_ADMIN_EMAIL: Swami123@example.com
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana:/etc/grafana/provisioning
+    depends_on:
+      - postgres
+    networks:
+      - amazon_network
+
+volumes:
+  postgres_data:
+  grafana_data:
+
+networks:
+  amazon_network:
+    driver: bridge
